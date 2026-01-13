@@ -13,10 +13,12 @@ export async function GET(request: NextRequest) {
 
     const where: any = {}
     
-    // Support status=all to get all students including non-active
+    // Support status filter: 'AKTIF', 'TIDAK_AKTIF', 'all'
     const statusParam = searchParams.get('status')
     if (statusParam === 'all') {
-      // No status filter
+      // No status filter - get all
+    } else if (statusParam === 'TIDAK_AKTIF') {
+      where.status = 'TIDAK_AKTIF'
     } else {
       where.status = 'AKTIF'
     }

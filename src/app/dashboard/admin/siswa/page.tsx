@@ -8,7 +8,7 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Spinner } from '@/components/ui/spinner'
-import { Plus, Edit, Trash2, Eye, X, Upload, Download, FileSpreadsheet } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, X, Upload, Download, FileSpreadsheet, RotateCcw, Users, UserX } from 'lucide-react'
 import Link from 'next/link'
 
 interface Siswa {
@@ -69,6 +69,7 @@ export default function SiswaPage() {
   const [selectedTahunAjaran, setSelectedTahunAjaran] = useState('')
   const [selectedKelas, setSelectedKelas] = useState('')
   const [selectedSiswa, setSelectedSiswa] = useState('')
+  const [showDeleted, setShowDeleted] = useState(false)
   
   // Modal
   const [showModal, setShowModal] = useState(false)
@@ -115,6 +116,7 @@ export default function SiswaPage() {
       if (selectedKelas) params.set('kelasId', selectedKelas)
       if (selectedSiswa) params.set('siswaId', selectedSiswa)
       params.set('page', pagination.page.toString())
+      params.set('status', showDeleted ? 'TIDAK_AKTIF' : 'AKTIF')
       
       const res = await fetch(`/api/siswa?${params}`)
       const data = await res.json()
@@ -125,7 +127,7 @@ export default function SiswaPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedTahunAjaran, selectedKelas, selectedSiswa, pagination.page])
+  }, [selectedTahunAjaran, selectedKelas, selectedSiswa, pagination.page, showDeleted])
 
   useEffect(() => {
     const timer = setTimeout(() => fetchSiswa(), 300)
@@ -194,10 +196,32 @@ export default function SiswaPage() {
     if (!confirm('Yakin ingin menghapus siswa ini?')) return
     
     try {
-      await fetch(`/api/siswa/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/siswa/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (res.ok) {
+        alert(data.message || 'Siswa berhasil dihapus')
+      }
       fetchSiswa()
     } catch {
       console.error('Error deleting siswa')
+    }
+  }
+
+  const handleRestore = async (id: string) => {
+    if (!confirm('Yakin ingin memulihkan siswa ini?')) return
+    
+    try {
+      const res = await fetch(`/api/siswa/${id}`, { 
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore' })
+      })
+      if (res.ok) {
+        alert('Siswa berhasil dipulihkan')
+        fetchSiswa()
+      }
+    } catch {
+      console.error('Error restoring siswa')
     }
   }
 
@@ -281,11 +305,33 @@ export default function SiswaPage() {
 
           <div className="flex-1" />
 
+          {/* Toggle Deleted Students */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => { setShowDeleted(false); setPagination(p => ({...p, page: 1})); }}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                !showDeleted ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Aktif
+            </button>
+            <button
+              onClick={() => { setShowDeleted(true); setPagination(p => ({...p, page: 1})); }}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors ${
+                showDeleted ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <UserX className="w-4 h-4" />
+              Dihapus
+            </button>
+          </div>
+
           <Button variant="outline" onClick={() => setShowImportModal(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Import Excel
           </Button>
-          <Button onClick={() => { setShowModal(true); setForm({...initialForm, kelasId: selectedKelas || kelasList[0]?.id || ''}); setEditId(null); }}>
+          <Button onClick={() => { setShowModal(true); setForm({...initialForm, kelasId: selectedKelas || kelasList[0]?.id || ''}); setEditId(null); }} disabled={showDeleted}>
             <Plus className="w-4 h-4 mr-2" />
             Tambah Siswa
           </Button>
@@ -336,12 +382,20 @@ export default function SiswaPage() {
                             <Eye className="w-4 h-4" />
                           </Button>
                         </Link>
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(siswa.id)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(siswa.id)}>
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
+                        {showDeleted ? (
+                          <Button variant="ghost" size="icon" onClick={() => handleRestore(siswa.id)} title="Pulihkan">
+                            <RotateCcw className="w-4 h-4 text-green-600" />
+                          </Button>
+                        ) : (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(siswa.id)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(siswa.id)}>
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
