@@ -109,6 +109,8 @@ export default function PengaturanPage() {
     }
   }
 
+  const [logoVersion, setLogoVersion] = useState(Date.now())
+
   const handleLogoUpload = async (type: 'sekolah' | 'yayasan', file: File) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -127,6 +129,7 @@ export default function PengaturanPage() {
           ...prev,
           [type === 'sekolah' ? 'logoSekolah' : 'logoYayasan']: data.path
         }))
+        setLogoVersion(Date.now()) // Force refresh
         setMessage({ type: 'success', text: `Logo ${type} berhasil diupload` })
       } else {
         setMessage({ type: 'error', text: data.error || 'Gagal mengupload logo' })
@@ -152,6 +155,7 @@ export default function PengaturanPage() {
           ...prev,
           [type === 'sekolah' ? 'logoSekolah' : 'logoYayasan']: null
         }))
+        setLogoVersion(Date.now()) // Force refresh
         setMessage({ type: 'success', text: `Logo ${type} berhasil dihapus` })
       } else {
         setMessage({ type: 'error', text: data.error || 'Gagal menghapus logo' })
@@ -303,7 +307,7 @@ export default function PengaturanPage() {
                       >
                         <X className="w-4 h-4" />
                       </button>
-                      <img src={settings.logoSekolah} alt="Logo Sekolah" className="w-20 h-20 mx-auto object-contain" />
+                      <img src={`${settings.logoSekolah}?v=${logoVersion}`} alt="Logo Sekolah" className="w-20 h-20 mx-auto object-contain" />
                       <p className="text-xs text-gray-500">Logo tersimpan</p>
                     </div>
                   ) : (
@@ -344,7 +348,7 @@ export default function PengaturanPage() {
                       >
                         <X className="w-4 h-4" />
                       </button>
-                      <img src={settings.logoYayasan} alt="Logo Yayasan" className="w-20 h-20 mx-auto object-contain" />
+                      <img src={`${settings.logoYayasan}?v=${logoVersion}`} alt="Logo Yayasan" className="w-20 h-20 mx-auto object-contain" />
                       <p className="text-xs text-gray-500">Logo tersimpan</p>
                     </div>
                   ) : (
