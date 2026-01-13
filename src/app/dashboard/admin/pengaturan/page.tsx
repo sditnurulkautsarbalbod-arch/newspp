@@ -111,6 +111,40 @@ export default function PengaturanPage() {
 
   const [logoVersion, setLogoVersion] = useState(Date.now())
 
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch('/api/settings')
+      const data = await res.json()
+      if (data && data.id) {
+        setSettings({
+          ...defaultSettings,
+          ...data,
+          namaYayasan: data.namaYayasan || '',
+          namaSekolah: data.namaSekolah || '',
+          alamat: data.alamat || '',
+          kelurahan: data.kelurahan || '',
+          kecamatan: data.kecamatan || '',
+          kabKota: data.kabKota || '',
+          provinsi: data.provinsi || '',
+          noTelepon: data.noTelepon || '',
+          email: data.email || '',
+          website: data.website || '',
+          namaBendahara: data.namaBendahara || '',
+          formatKuitansi: data.formatKuitansi || 'KWT/{tahun}/{bulan}/{tanggal}/{nomor}',
+          bulanMulai: data.bulanMulai || 7,
+          logoSekolah: data.logoSekolah || null,
+          logoYayasan: data.logoYayasan || null
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchSettings().finally(() => setLoading(false))
+  }, [])
+
   const handleLogoUpload = async (type: 'sekolah' | 'yayasan', file: File) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -124,12 +158,10 @@ export default function PengaturanPage() {
 
       const data = await res.json()
       
-      if (res.ok) {
-        setSettings(prev => ({
-          ...prev,
-          [type === 'sekolah' ? 'logoSekolah' : 'logoYayasan']: data.path
-        }))
-        setLogoVersion(Date.now()) // Force refresh
+      if (res.ok && data.success) {
+        // Refetch settings to get the latest data
+        await fetchSettings()
+        setLogoVersion(Date.now())
         setMessage({ type: 'success', text: `Logo ${type} berhasil diupload` })
       } else {
         setMessage({ type: 'error', text: data.error || 'Gagal mengupload logo' })
@@ -150,12 +182,10 @@ export default function PengaturanPage() {
 
       const data = await res.json()
       
-      if (res.ok) {
-        setSettings(prev => ({
-          ...prev,
-          [type === 'sekolah' ? 'logoSekolah' : 'logoYayasan']: null
-        }))
-        setLogoVersion(Date.now()) // Force refresh
+      if (res.ok && data.success) {
+        // Refetch settings to get the latest data
+        await fetchSettings()
+        setLogoVersion(Date.now())
         setMessage({ type: 'success', text: `Logo ${type} berhasil dihapus` })
       } else {
         setMessage({ type: 'error', text: data.error || 'Gagal menghapus logo' })
