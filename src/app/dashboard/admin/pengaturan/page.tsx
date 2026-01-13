@@ -120,16 +120,20 @@ export default function PengaturanPage() {
         body: formData
       })
 
+      const data = await res.json()
+      
       if (res.ok) {
-        const data = await res.json()
         setSettings(prev => ({
           ...prev,
           [type === 'sekolah' ? 'logoSekolah' : 'logoYayasan']: data.path
         }))
         setMessage({ type: 'success', text: `Logo ${type} berhasil diupload` })
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Gagal mengupload logo' })
       }
-    } catch {
-      setMessage({ type: 'error', text: 'Gagal mengupload logo' })
+    } catch (err) {
+      console.error('Upload error:', err)
+      setMessage({ type: 'error', text: 'Gagal mengupload logo. Cek koneksi dan coba lagi.' })
     }
   }
 
@@ -141,14 +145,19 @@ export default function PengaturanPage() {
         body: JSON.stringify({ type })
       })
 
+      const data = await res.json()
+      
       if (res.ok) {
         setSettings(prev => ({
           ...prev,
           [type === 'sekolah' ? 'logoSekolah' : 'logoYayasan']: null
         }))
         setMessage({ type: 'success', text: `Logo ${type} berhasil dihapus` })
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Gagal menghapus logo' })
       }
-    } catch {
+    } catch (err) {
+      console.error('Delete error:', err)
       setMessage({ type: 'error', text: 'Gagal menghapus logo' })
     }
   }
