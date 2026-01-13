@@ -227,7 +227,7 @@ function generatePDF(data: any[], tahunAjaranNama: string, tab: string, tahunMul
         
         const item = d.items.find((i: any) => i.bulan === bulan)
         if (item) {
-          row.push(item.status === 'LUNAS' ? '✓' : item.status === 'SEBAGIAN' ? '~' : 'X')
+          row.push(item.status === 'LUNAS' ? 'V' : item.status === 'SEBAGIAN' ? '~' : 'X')
         } else {
           row.push('-')
         }
@@ -239,12 +239,30 @@ function generatePDF(data: any[], tahunAjaranNama: string, tab: string, tahunMul
       startY: 35,
       head: headers,
       body: bodyData,
-      styles: { fontSize: 8, cellPadding: 2 },
+      styles: { fontSize: 8, cellPadding: 2, halign: 'center' },
       headStyles: { fillColor: [59, 130, 246] },
       columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 20 }
+        0: { cellWidth: 25, halign: 'left' },
+        1: { cellWidth: 40, halign: 'left' },
+        2: { cellWidth: 20, halign: 'center' }
+      },
+      didParseCell: function(data) {
+        // Style status cells (columns 3-14 are month columns)
+        if (data.section === 'body' && data.column.index >= 3) {
+          const value = data.cell.raw as string
+          if (value === 'V') {
+            data.cell.styles.textColor = [22, 163, 74] // green-600
+            data.cell.styles.fontStyle = 'bold'
+          } else if (value === '~') {
+            data.cell.styles.textColor = [202, 138, 4] // yellow-600
+            data.cell.styles.fontStyle = 'bold'
+          } else if (value === 'X') {
+            data.cell.styles.textColor = [220, 38, 38] // red-600
+            data.cell.styles.fontStyle = 'bold'
+          } else {
+            data.cell.styles.textColor = [156, 163, 175] // gray-400
+          }
+        }
       }
     })
   } else {
@@ -279,7 +297,7 @@ function generatePDF(data: any[], tahunAjaranNama: string, tab: string, tahunMul
   // Legend
   const finalY = (doc as any).lastAutoTable?.finalY || 35
   doc.setFontSize(9)
-  doc.text('Keterangan: ✓ = Lunas, ~ = Sebagian, X = Belum Bayar, - = Tidak ada tagihan/Belum masuk/Sudah keluar', 14, finalY + 10)
+  doc.text('Keterangan: V = Lunas, ~ = Sebagian, X = Belum Bayar, - = Tidak ada tagihan/Belum masuk/Sudah keluar', 14, finalY + 10)
 
   const buffer = Buffer.from(doc.output('arraybuffer'))
   
