@@ -98,6 +98,7 @@ export default function StatusPembayaranPage() {
   const [showDetail, setShowDetail] = useState(false)
   const [detailData, setDetailData] = useState<{
     siswa: { nama: string; nipd: string; kelas: string }
+    tagihanId: string
     tagihan: string
     periode: string
     jumlahTagihan: number
@@ -211,6 +212,7 @@ export default function StatusPembayaranPage() {
   const handleShowDetail = (siswa: TagihanGrouped['siswa'], tagihan: any, isMonthly: boolean) => {
     setDetailData({
       siswa,
+      tagihanId: tagihan.id,
       tagihan: isMonthly ? 'SPP' : tagihan.nama,
       periode: isMonthly ? `${BULAN_INDONESIA[tagihan.bulan - 1]} ${tagihan.tahun}` : '-',
       jumlahTagihan: tagihan.jumlahTagihan,
@@ -731,7 +733,7 @@ export default function StatusPembayaranPage() {
                     handleOpenPayment(
                       { id: '', nama: detailData.siswa.nama, kelas: detailData.siswa.kelas, nipd: detailData.siswa.nipd },
                       { 
-                        id: detailData.tagihan, 
+                        id: detailData.tagihanId, 
                         jumlahTagihan: detailData.jumlahTagihan, 
                         jumlahDibayar: detailData.jumlahDibayar 
                       }
