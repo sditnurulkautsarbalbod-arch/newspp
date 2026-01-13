@@ -1,0 +1,236 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  password      String?
+  nipd          String?   @unique
+  nama          String
+  role          String
+  siswaId       String?
+  siswa         Siswa?    @relation(fields: [siswaId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([email])
+  @@index([nipd])
+}
+
+model TahunAjaran {
+  id            String    @id @default(cuid())
+  nama          String    @unique
+  tahunMulai    Int
+  tahunSelesai  Int
+  aktif         Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  siswa         Siswa[]
+  jenisTagihan  JenisTagihan[]
+  tagihan       Tagihan[]
+  kelas         Kelas[]
+  siswaHistori  SiswaHistori[]
+}
+
+model Kelas {
+  id            String    @id @default(cuid())
+  nama          String
+  tingkat       Int       // 1-6 untuk SD, 7-9 untuk SMP, 10-12 untuk SMA
+  tahunAjaranId String
+  tahunAjaran   TahunAjaran @relation(fields: [tahunAjaranId], references: [id])
+  aktif         Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  siswa         Siswa[]
+  jenisTagihan  JenisTagihanKelas[]
+
+  @@unique([nama, tahunAjaranId])
+  @@index([tahunAjaranId])
+}
+
+model Siswa {
+  id            String    @id @default(cuid())
+  nipd          String    @unique
+  nama          String
+  kelasId       String?
+  kelas         Kelas?    @relation(fields: [kelasId], references: [id])
+  kelasNama     String    // Backup nama kelas untuk histori
+  jenisKelamin  String?
+  tempatLahir   String?
+  tanggalLahir  DateTime?
+  alamat        String?
+  namaOrangTua  String?
+  noTelepon     String?
+  tahunAjaranId String
+  tahunAjaran   TahunAjaran @relation(fields: [tahunAjaranId], references: [id])
+  tahunMasuk    Int?      // Tahun pertama masuk sekolah
+  status        String    @default("AKTIF") // AKTIF, LULUS, PINDAH, KELUAR
+  tanggalKeluar DateTime? // Tanggal siswa keluar/pindah/lulus
+  alasanKeluar  String?   // Alasan keluar/pindah
+  aktif         Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tagihan       Tagihan[]
+  users         User[]
+  jenisTagihanSiswa JenisTagihanSiswa[]
+  histori       SiswaHistori[]
+
+  @@index([nipd])
+  @@index([kelasId])
+  @@index([tahunAjaranId])
+  @@index([status])
+}
+
+model JenisTagihan {
+  id            String    @id @default(cuid())
+  nama          String
+  kategori      String    // BULANAN, TAHUNAN, INSIDENTAL
+  nominal       Float
+  tahunAjaranId String
+  tahunAjaran   TahunAjaran @relation(fields: [tahunAjaranId], references: [id])
+  tipeTarget    String    @default("SEMUA") // SEMUA, PER_KELAS, PER_SISWA
+  aktif         Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tagihan       Tagihan[]
+  targetKelas   JenisTagihanKelas[]
+  targetSiswa   JenisTagihanSiswa[]
+
+  @@index([tahunAjaranId])
+  @@index([tipeTarget])
+  @@index([aktif])
+}
+
+// Relasi many-to-many: JenisTagihan per Kelas
+model JenisTagihanKelas {
+  id              String    @id @default(cuid())
+  jenisTagihanId  String
+  jenisTagihan    JenisTagihan @relation(fields: [jenisTagihanId], references: [id], onDelete: Cascade)
+  kelasId         String
+  kelas           Kelas     @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  nominalKhusus   Float?    // Nominal khusus untuk kelas ini (opsional)
+  createdAt       DateTime  @default(now())
+
+  @@unique([jenisTagihanId, kelasId])
+  @@index([jenisTagihanId])
+  @@index([kelasId])
+}
+
+// Relasi many-to-many: JenisTagihan per Siswa
+model JenisTagihanSiswa {
+  id              String    @id @default(cuid())
+  jenisTagihanId  String
+  jenisTagihan    JenisTagihan @relation(fields: [jenisTagihanId], references: [id], onDelete: Cascade)
+  siswaId         String
+  siswa           Siswa     @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  nominalKhusus   Float?    // Nominal khusus untuk siswa ini (opsional)
+  alasan          String?   // Alasan pemberian tarif khusus
+  createdAt       DateTime  @default(now())
+
+  @@unique([jenisTagihanId, siswaId])
+  @@index([jenisTagihanId])
+  @@index([siswaId])
+}
+
+model Tagihan {
+  id              String    @id @default(cuid())
+  siswaId         String
+  siswa           Siswa     @relation(fields: [siswaId], references: [id])
+  jenisTagihanId  String
+  jenisTagihan    JenisTagihan @relation(fields: [jenisTagihanId], references: [id])
+  tahunAjaranId   String
+  tahunAjaran     TahunAjaran @relation(fields: [tahunAjaranId], references: [id])
+  bulan           Int?
+  tahun           Int?
+  jumlahTagihan   Float
+  jumlahDibayar   Float     @default(0)
+  status          String    @default("BELUM_LUNAS")
+  tanggalJatuhTempo DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  pembayaran      Pembayaran[]
+
+  @@unique([siswaId, jenisTagihanId, bulan, tahun])
+  @@index([siswaId])
+  @@index([jenisTagihanId])
+  @@index([tahunAjaranId])
+  @@index([status])
+}
+
+model Pembayaran {
+  id            String    @id @default(cuid())
+  tagihanId     String
+  tagihan       Tagihan   @relation(fields: [tagihanId], references: [id])
+  jumlahBayar   Float
+  tanggalBayar  DateTime  @default(now())
+  metodeBayar   String?
+  keterangan    String?
+  nomorKuitansi String    @unique
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tagihanId])
+  @@index([tanggalBayar])
+  @@index([nomorKuitansi])
+}
+
+model SekolahSettings {
+  id              String    @id @default(cuid())
+  namaYayasan     String?
+  namaSekolah     String
+  alamat          String?
+  kelurahan       String?
+  kecamatan       String?
+  kabKota         String?
+  provinsi        String?
+  noTelepon       String?
+  email           String?
+  website         String?
+  logoSekolah     String?   // Path to logo file
+  logoYayasan     String?   // Path to logo file
+  namaBendahara   String?   // Nama bendahara untuk kuitansi
+  formatKuitansi  String    @default("KWT/{tahun}/{bulan}/{nomor}") // Format: KWT/2024/01/0001
+  bulanMulai      Int       @default(7) // Bulan awal tahun ajaran (7=Juli, 1=Januari)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model DatabaseBackup {
+  id            String    @id @default(cuid())
+  filename      String
+  filesize      Int
+  createdBy     String?
+  createdAt     DateTime  @default(now())
+}
+
+// Histori perjalanan siswa (kelas, status, dll)
+model SiswaHistori {
+  id              String    @id @default(cuid())
+  siswaId         String
+  siswa           Siswa     @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  tahunAjaranId   String
+  tahunAjaran     TahunAjaran @relation(fields: [tahunAjaranId], references: [id])
+  kelasId         String?
+  kelasNama       String
+  tipeAksi        String    // MASUK_BARU, NAIK_KELAS, PINDAH_KELAS, TINGGAL_KELAS, PINDAH_MASUK, PINDAH_KELUAR, KELUAR, LULUS
+  keterangan      String?
+  tanggalAksi     DateTime  @default(now())
+  createdBy       String?
+  createdAt       DateTime  @default(now())
+
+  @@index([siswaId])
+  @@index([tahunAjaranId])
+  @@index([tipeAksi])
+}

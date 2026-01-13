@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# database
+*.db
+*.db-journal
+
+# backups
+/backups/
+
+# uploads
+/public/uploads/
+
+# misc artifacts
+nul
+Proposal_Sistem_SPP.pdf
+proposal_generator.py
