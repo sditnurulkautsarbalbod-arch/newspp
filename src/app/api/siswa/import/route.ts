@@ -27,7 +27,16 @@ export async function POST(request: NextRequest) {
     const kelasList = await prisma.kelas.findMany({
       where: { tahunAjaranId }
     })
-    const kelasMap = new Map(kelasList.map(k => [k.nama.toUpperCase(), k.id]))
+    const kelasMap = new Map(kelasList.map(k => [k.nama.toUpperCase(), k]))
+
+    // Get tahun ajaran info for tagihan generation
+    const tahunAjaran = await prisma.tahunAjaran.findUnique({
+      where: { id: tahunAjaranId }
+    })
+
+    if (!tahunAjaran) {
+      return NextResponse.json({ error: 'Tahun ajaran tidak ditemukan' }, { status: 400 })
+    }
 
     const results = {
       success: 0,
@@ -54,8 +63,8 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        const kelasId = kelasMap.get(kelasNama)
-        if (!kelasId) {
+        const kelas = kelasMap.get(kelasNama)
+        if (!kelas) {
           results.failed++
           results.errors.push(`Baris ${rowNum}: Kelas "${kelasNama}" tidak ditemukan`)
           continue
@@ -69,28 +78,83 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        // Create siswa
-        const siswa = await prisma.siswa.create({
-          data: {
-            nipd,
-            nama,
-            kelasId,
-            kelasNama,
-            jenisKelamin: jenisKelamin === 'P' ? 'P' : 'L',
-            alamat: alamat || null,
-            namaOrangTua: namaOrangTua || null,
-            noTelepon: noTelepon || null,
-            tahunAjaranId,
-          }
-        })
+        // Create siswa with tagihan in transaction
+        await prisma.$transaction(async (tx) => {
+          // Create siswa
+          const siswa = await tx.siswa.create({
+            data: {
+              nipd,
+              nama,
+              kelasId: kelas.id,
+              kelasNama: kelas.nama,
+              jenisKelamin: jenisKelamin === 'P' ? 'P' : 'L',
+              alamat: alamat || null,
+              namaOrangTua: namaOrangTua || null,
+              noTelepon: noTelepon || null,
+              tahunAjaranId,
+            }
+          })
 
-        // Create parent user
-        await prisma.user.create({
-          data: {
-            nipd,
-            nama: namaOrangTua || `Orang Tua ${nama}`,
-            role: 'ORANG_TUA',
-            siswaId: siswa.id,
+          // Create parent user
+          await tx.user.create({
+            data: {
+              nipd,
+              nama: namaOrangTua || `Orang Tua ${nama}`,
+              role: 'ORANG_TUA',
+              siswaId: siswa.id,
+            }
+          })
+
+          // Generate tagihan for the student based on tipeTarget
+          const jenisTagihanList = await tx.jenisTagihan.findMany({
+            where: { 
+              tahunAjaranId, 
+              aktif: true,
+              OR: [
+                { tipeTarget: 'SEMUA' },
+                { targetKelas: { some: { kelasId: kelas.id } } }
+              ]
+            },
+            include: {
+              targetKelas: { where: { kelasId: kelas.id } }
+            }
+          })
+
+          for (const jt of jenisTagihanList) {
+            // Determine nominal (check for special nominal)
+            let nominal = jt.nominal
+            if (jt.targetKelas.length > 0 && jt.targetKelas[0].nominalKhusus) {
+              nominal = jt.targetKelas[0].nominalKhusus
+            }
+
+            if (jt.kategori === 'BULANAN') {
+              // Create 12 monthly tagihan
+              for (let m = 0; m < 12; m++) {
+                const bulan = m < 6 ? m + 7 : m - 5 // Juli-Des (7-12), Jan-Jun (1-6)
+                const tahun = m < 6 ? tahunAjaran.tahunMulai : tahunAjaran.tahunSelesai
+                
+                await tx.tagihan.create({
+                  data: {
+                    siswaId: siswa.id,
+                    jenisTagihanId: jt.id,
+                    tahunAjaranId,
+                    bulan,
+                    tahun,
+                    jumlahTagihan: nominal
+                  }
+                })
+              }
+            } else {
+              // TAHUNAN or INSIDENTAL - create single tagihan
+              await tx.tagihan.create({
+                data: {
+                  siswaId: siswa.id,
+                  jenisTagihanId: jt.id,
+                  tahunAjaranId,
+                  jumlahTagihan: nominal
+                }
+              })
+            }
           }
         })
 
