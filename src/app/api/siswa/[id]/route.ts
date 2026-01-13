@@ -81,15 +81,50 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    // Soft delete - just mark as inactive
-    await prisma.siswa.update({
+    // Check if siswa has any payments
+    const siswa = await prisma.siswa.findUnique({
       where: { id },
-      data: { aktif: false }
+      include: {
+        tagihan: {
+          where: { jumlahDibayar: { gt: 0 } }
+        }
+      }
+    })
+
+    if (!siswa) {
+      return NextResponse.json({ error: 'Siswa tidak ditemukan' }, { status: 404 })
+    }
+
+    // If student has payments, do soft delete
+    if (siswa.tagihan.length > 0) {
+      await prisma.siswa.update({
+        where: { id },
+        data: { 
+          status: 'TIDAK_AKTIF',
+          aktif: false 
+        }
+      })
+      return NextResponse.json({ message: 'Siswa berhasil dinonaktifkan (memiliki riwayat pembayaran)' })
+    }
+
+    // If no payments, do hard delete (delete all related records)
+    await prisma.$transaction(async (tx) => {
+      // Delete parent user
+      await tx.user.deleteMany({ where: { siswaId: id } })
+      
+      // Delete tagihan (which will cascade delete pembayaran due to relation)
+      await tx.tagihan.deleteMany({ where: { siswaId: id } })
+      
+      // Delete siswa histori
+      await tx.siswaHistori.deleteMany({ where: { siswaId: id } })
+      
+      // Delete siswa
+      await tx.siswa.delete({ where: { id } })
     })
 
     return NextResponse.json({ message: 'Siswa berhasil dihapus' })
   } catch (error) {
     console.error('Error deleting siswa:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Gagal menghapus siswa' }, { status: 500 })
   }
 }
